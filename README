@@ -2,12 +2,13 @@ A bloomfilter implementation in c++.
 
 ROADMAP
 - bloom filter
-- tests
-- strings and separate class
-- template
+- tests and analysis
+
+- strings and separate classes or template
 - scalable
-- compatible with all archs
-- size_t
+- compatible with all archs, size_t
+
+- multiple hash functions
 - comparison
 
 

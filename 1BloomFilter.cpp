@@ -15,18 +15,21 @@ class Bitvector
 		int size;
 		/** Bytes per char **/
 		static const int BPC = 8;
+
 	public:
 		Bitvector(int items)
 		{
 			size = items;
 			bitset = new unsigned char[(size/BPC)+1];
 		}
+
 		void set(int index)
 		{
 			int arrPosition = index/BPC;
 			int maskPosition =  index%BPC;
 			bitset[arrPosition] |= (1<<maskPosition);
 		}
+
 		/** return 1 for true **/
 		int isSet(int index)
 		{
@@ -34,66 +37,100 @@ class Bitvector
 			int maskPosition =  index%BPC;
 			return (bitset[arrPosition] & (1<<maskPosition)) > 0 ? 1 : 0;
 		}
+
 		~Bitvector()
 		{
 			delete bitset;
 		}
 };
 
+/*** Currently supporting upto 5 hash functions ***/
 class Bloomfilter
 {
 	private:
 		Bitvector *bv;
-		int size;
+		int bits;
 		int hashFunctionCount;
-		int seed;
+		int *seeds;
+
 		static const double LOG2 = 0.69314718056;
-		static const int MAX_ELEMENTS_SUPPORTED = 1<<10; // ~1m
-		static const int DEFAULT_SIZE = 1<<13; // 8KB
+		static const double E = 2.71828182845;
+		static const int MAX_ELEMENTS_SUPPORTED = 1<<16; // 65k
+		static const int DEFAULT_SIZE = 1<<13; // 1KB
 
 		/** 
 		* Generate hash for data, 
 		* Thanks to https://github.com/aappleby/smhasher for awesome implementation
 		**/
-		int generateHash(long data)
+		int generateHash(long key, int hashFnIndex)
 		{
-			int hash = MurmurHash2(&data, 64, seed);
+			int hash = MurmurHash2(&key, 64, seeds[hashFnIndex]);
 			if(hash < 0)
 			{
 				return hash*(-1);
 			}
 			return hash;
 		}
+
 	public:
 		Bloomfilter()
 		{
-			size = DEFAULT_SIZE;
-			bv = new Bitvector(size);
-			hashFunctionCount = (size*LOG2)/MAX_ELEMENTS_SUPPORTED;
+			bits = DEFAULT_SIZE;
+			bv = new Bitvector(bits);
+			hashFunctionCount = (bits*LOG2)/MAX_ELEMENTS_SUPPORTED;
+
+			seeds = new int[hashFunctionCount];
 			srand(time(NULL));
-			seed = rand()%1000;
+			for(int i=0; i<hashFunctionCount; i++)
+			{
+				seeds[i] = rand()%1000; 
+			}
 		}
+
 		Bloomfilter(int nBits)
 		{
-			size = nBits;
-			bv = new Bitvector(size);
-			hashFunctionCount = (size*LOG2)/MAX_ELEMENTS_SUPPORTED;
+			bits = nBits;
+			bv = new Bitvector(bits);
+			hashFunctionCount = (bits*LOG2)/MAX_ELEMENTS_SUPPORTED;
+
+			seeds = new int[hashFunctionCount];
+			srand(time(NULL));
+			for(int i=0; i<hashFunctionCount; i++)
+			{
+				seeds[i] = rand()%1000; 
+			}
 		}
+
 		void add(long key)
 		{
-			int index = generateHash(key);
-			bv->set(index);
+			for(int i=0; i<hashFunctionCount; i++)
+			{
+				int index = generateHash(key, seeds[i]);
+				bv->set(index%bits);
+			}
 		}
-		/** return 1 for true **/
+
+		/** 0 means definitely not there, 1 means probably there **/
 		int probablyContains(long key)
 		{
-			int index = generateHash(key);
-			return bv->isSet(index);
+			for(int i=0; i<hashFunctionCount; i++)
+			{
+				int index = generateHash(key, seeds[i]);
+				if(!bv->isSet(index%bits))
+				{
+					return 0;
+				}
+			}
+			return 1;
 		}
-		int getFalsePositiveRate()
+
+		float getFalsePositiveRate()
 		{
-			return 0;
+			float x = ((float)MAX_ELEMENTS_SUPPORTED/bits)*hashFunctionCount;
+			float base = pow(E,x);
+			return pow((1-base), hashFunctionCount);
 		}
+
 		~Bloomfilter()
 		{
 			delete bv;
@@ -114,6 +151,6 @@ int main()
 	Bloomfilter *bf = new Bloomfilter();
 	bf->add(19900);
 	bf->add(2000);
+	cout<<bf->getFalsePositiveRate()<<endl;
 	return 0;
 }
-
