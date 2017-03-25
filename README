@@ -3,7 +3,7 @@ A bloomfilter implementation in c++.
 ROADMAP
 - bloom filter
 - tests
-- separate class
+- strings and separate class
 - template
 - scalable
 - compatible with all archs
@@ -12,10 +12,3 @@ ROADMAP
 
 
 
-
-1 2 3 4 5 6 7 8 9 10
-
-9
-arrpos index/8
-maskPos index%8
-bitset[arrpos] |= (1<<maskPos)
