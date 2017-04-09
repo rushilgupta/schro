@@ -2,6 +2,8 @@ A bloomfilter implementation in c++.
 
 ROADMAP
 - bloom filter
+- use share_ptr
+- common constructor
 - tests and analysis
 
 - strings and separate classes or template
