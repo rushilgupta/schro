@@ -64,14 +64,13 @@ class Bloomfilter
 		* Generate hash for data, 
 		* Thanks to https://github.com/aappleby/smhasher for awesome implementation
 		**/
-		int generateHash(string key, int hashFnIndex)
+		uint32_t generateHash(string key, int seed)
 		{
 			uint32_t hash[1];
-			MurmurHash3_x86_32(key.c_str(), 32, m_seeds[hashFnIndex], hash);
-			cout<<"key: "<<key<<" hash: "<<*hash<<endl;
+			MurmurHash3_x86_32(key.c_str(), 64, seed, hash);
 			if(*hash < 0)
 			{
-				return *hash*(-1);
+				return -*hash;
 			} 
 			return *hash;
 		}
@@ -94,8 +93,6 @@ class Bloomfilter
 			m_hashFunctionCount = (m_bits*LOG2)/nElements;
 			m_maxElementsSupported = nElements;
 
-			cout<<"k = "<<m_hashFunctionCount<<endl;
-
 			m_seeds = new int[m_hashFunctionCount];
 			srand(time(NULL));
 			for(int i=0; i<m_hashFunctionCount; i++)
@@ -108,9 +105,8 @@ class Bloomfilter
 		{
 			for(int i=0; i<m_hashFunctionCount; i++)
 			{
-				int index = generateHash(key, m_seeds[i]);
-				cout<<index<<"\t"<<i<<"\t"<<m_seeds[i]<<endl;
-				m_bv->set(index%m_bits);
+				int index = generateHash(key, m_seeds[i])%m_bits;
+				m_bv->set(index);
 			}
 		}
 
@@ -119,9 +115,8 @@ class Bloomfilter
 		{
 			for(int i=0; i<m_hashFunctionCount; i++)
 			{
-				int index = generateHash(key, m_seeds[i]);
-				cout<<index<<"\t"<<i<<"\t"<<m_seeds[i]<<endl;
-				if(!m_bv->isSet(index%m_bits))
+				int index = generateHash(key, m_seeds[i])%m_bits;
+				if(!m_bv->isSet(index))
 				{
 					return 0;
 				}
@@ -144,51 +139,61 @@ class Bloomfilter
 		}
 };
 
-/* run a dry run of bloom filter performance with m bits and n elements */
-/*int test(int m, int n)
+/* a 32 letter string */
+string getRandomString()
 {
-	set<long> myset;
-	Bloomfilter *bf = new Bloomfilter(m, n);
-	for(int i=0; i<1000; i++)
+	char randomString[32];
+	for(int i=0; i<32; i++)
 	{
-		//long random = rand()%n;
-		myset.insert(i);
-		bf->add(i);
+		randomString[i] = rand()%128 + 'a';
 	}
-	int counter = 0;
+	return std::string(randomString);
+}
+
+/* run a dry run of bloom filter performance with m bits and n elements */
+void test(int m, int n)
+{
+	set<string> myset;
+	Bloomfilter *bf = new Bloomfilter(m, n);
 	for(int i=0; i<n; i++)
 	{
-		if(myset.find(i) != myset.end() && bf->probablyContains(i) == 1) 
+		string randomString = getRandomString();
+		//cout<<randomString;
+		myset.insert(randomString);
+		bf->add(randomString);
+	}
+	int counter = 0;
+	int testUniverseSize = 1<<20;
+	for(int i=0; i<testUniverseSize; i++)
+	{
+		string randomString = getRandomString();
+		if(myset.find(randomString) == myset.end() && bf->probablyContains(randomString) == 1) 
 		{
 			counter++;
 		}
 	}
-	cout<<"found FP : "<<counter<<endl;
-	cout<<"expected FP : "<<bf->getFalsePositiveRate()<<endl;
-	int errors = 0;
+	float fp = (float)counter/testUniverseSize;
+	float epsilon = fp - bf->getFalsePositiveRate();
 	delete bf;
-	if (errors == 0)
+
+	cout << "found FP : "<< fp << endl;
+	cout << "expected FP : "<< bf->getFalsePositiveRate() << endl;
+	cout << "epsilon : " << epsilon << endl; 
+	if ( epsilon <= 0.0001f)
 	{
-		std::cout << "all tests ok" << std::endl;
+		cout << "dry-run test passed" << endl;
 	}
 	else
 	{
-		std::cerr << errors << " tests failed" << std::endl;
+		cerr << "test failed" << endl;
 	}
-	return errors;
-}*/
+}
 
 int main(int argc, char* argv[])
 {
 	if (argc <= 2)
 	{
-		long n = 1<<13;
-		Bloomfilter *bf = new Bloomfilter(1<<16, n);
-		bf->add("356");
-		bf->probablyContains("356");
-		// test(1<<16, n);
-		return 0;
+		test(1<<18, 1<<15);
 	}
-	cout<<"USAGE: filter <bits to use> \nOR SIMPLY: filter"<<endl;
 	return 0;
 }
