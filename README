@@ -1,12 +1,9 @@
 A bloomfilter implementation in c++.
 
 ROADMAP
-- tests and analysis
 - scalable
-- compatible with all archs, size_t
-
-- multiple hash functions
-- comparison
+- moar metrics
+- writeup
 
 
 
