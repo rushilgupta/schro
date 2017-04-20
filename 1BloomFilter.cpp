@@ -45,7 +45,6 @@ class Bitvector
 		}
 };
 
-/*** Currently supporting upto 5 hash functions ***/
 class Bloomfilter
 {
 	private:
@@ -57,8 +56,8 @@ class Bloomfilter
 
 		static const double LOG2 = 0.69314718056;
 		static const double E = 2.71828182845;
-		static const int MAX_ELEMENTS_SUPPORTED = 1<<13; // 8K
-		static const int DEFAULT_SIZE = 1<<16; // 8KB
+		static const int MAX_ELEMENTS_SUPPORTED = 1<<20; // 1m
+		static const int DEFAULT_SIZE = 1<<23; // 1MB
 
 		/** 
 		* Generate hash for data, 
@@ -93,9 +92,9 @@ class Bloomfilter
 			m_hashFunctionCount = (m_bits*LOG2)/nElements;
 			m_maxElementsSupported = nElements;
 
-			m_seeds = new int[m_hashFunctionCount];
+			m_seeds = new int[2];
 			srand(time(NULL));
-			for(int i=0; i<m_hashFunctionCount; i++)
+			for(int i=0; i<2; i++)
 			{
 				m_seeds[i] = rand()%1000;
 			}
@@ -103,9 +102,11 @@ class Bloomfilter
 
 		void add(string key)
 		{
+			uint32_t hashA = generateHash(key, m_seeds[0]);
+			uint32_t hashB = generateHash(key, m_seeds[1]);
 			for(int i=0; i<m_hashFunctionCount; i++)
 			{
-				int index = generateHash(key, m_seeds[i])%m_bits;
+				int index = (hashA + i*(hashB%m_bits))%m_bits;
 				m_bv->set(index);
 			}
 		}
@@ -113,9 +114,11 @@ class Bloomfilter
 		/** 0 means definitely not there, 1 means probably there **/
 		int probablyContains(string key)
 		{
+			uint32_t hashA = generateHash(key, m_seeds[0]);
+			uint32_t hashB = generateHash(key, m_seeds[1]);
 			for(int i=0; i<m_hashFunctionCount; i++)
 			{
-				int index = generateHash(key, m_seeds[i])%m_bits;
+				int index = (hashA + i*(hashB%m_bits))%m_bits;
 				if(!m_bv->isSet(index))
 				{
 					return 0;
@@ -163,7 +166,7 @@ void test(int m, int n)
 		bf->add(randomString);
 	}
 	int counter = 0;
-	int testUniverseSize = 1<<20;
+	int testUniverseSize = 4*n;
 	for(int i=0; i<testUniverseSize; i++)
 	{
 		string randomString = getRandomString();
@@ -193,7 +196,7 @@ int main(int argc, char* argv[])
 {
 	if (argc <= 2)
 	{
-		test(1<<18, 1<<15);
+		test(1<<25, 1<<22);
 	}
 	return 0;
 }
